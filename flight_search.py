@@ -43,6 +43,7 @@ class FlightSearch:
             'date_to': six_month_formatted,
             'nights_in_dst_from': 7,
             'nights_in_dst_to': 28,
+            "one_for_city": 1,
             'flight_type': 'round',
             'curr': 'USD',
             'price_to': city['lowestPrice'],
@@ -52,12 +53,27 @@ class FlightSearch:
         response = requests.get(url=f"{kiwi_endpoint}/v2/search", headers=header, params=params)
         try:
             data = response.json()["data"][0]
+            flight_data = FlightData(price=data['price'], origin_city=data['cityFrom'], origin_airport=data['flyFrom'],
+                                     destination_city=data['cityTo'], destination_airport=data['cityCodeTo'],
+                                     out_date=data['route'][0]['local_departure'].split("T")[0],
+                                     return_date=data['route'][1]['local_departure'].split("T")[0],
+                                     link=data['deep_link'])
+            return flight_data
         except IndexError:
-            print(f"No flights found for {city['iataCode']}.")
-            return None
+            # with layover
+            params['max_stopovers'] = 1
+            response = requests.get(url=f"{kiwi_endpoint}/v2/search", headers=header, params=params)
+            try:
+                data = response.json()["data"][0]
+                flight_data = FlightData(price=data['price'], origin_city=data['cityFrom'],
+                                         origin_airport=data['flyFrom'],
+                                         destination_city=data['cityTo'], destination_airport=data['cityCodeTo'],
+                                         out_date=data['route'][0]['local_departure'].split("T")[0],
+                                         return_date=data['route'][1]['local_departure'].split("T")[0],
+                                         link=data['deep_link'], stopover=1, via_city=data["route"][0]["cityTo"])
+                return flight_data
+            except IndexError:
+                print(f"No flights found for {city['iataCode']}.")
+                return None
 
-        flight_data = FlightData(price=data['price'], origin_city=data['cityFrom'], origin_airport=data['flyFrom'],
-                                 destination_city=data['cityTo'], destination_airport=data['cityCodeTo'],
-                                 out_date=data['route'][0]['local_departure'].split("T")[0],
-                                 return_date=data['route'][1]['local_departure'].split("T")[0], link=data['deep_link'])
-        return flight_data
+
